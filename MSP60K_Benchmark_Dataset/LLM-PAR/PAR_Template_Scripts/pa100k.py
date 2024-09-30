@@ -96,5 +96,5 @@ def generate_data_description(save_dir):
 
 
 if __name__ == "__main__":
-    save_dir = '/content/data/datasets/pa100k/'
+    save_dir = '/content/OpenPAR/data/pa100k/'
     generate_data_description(save_dir)
