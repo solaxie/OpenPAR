@@ -96,5 +96,5 @@ def generate_data_description(save_dir):
 
 
 if __name__ == "__main__":
-    save_dir = '/data/PA100k/'
+    save_dir = '/data/datasets/PA100k/'
     generate_data_description(save_dir)
