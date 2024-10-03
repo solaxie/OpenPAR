@@ -26,10 +26,10 @@ class TransformerClassifier(nn.Module):
         output = self.classifier(features)
         return output
 
-def load_model(checkpoint_path, num_classes):
+def load_model(checkpoint_path):
     checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
     clip_model = build_model(checkpoint['ViT_model'])
-    model = TransformerClassifier(clip_model, num_classes)
+    model = TransformerClassifier(clip_model, len(ATTRIBUTES))
     model.load_state_dict(checkpoint['model_state_dict'], strict=False)
     model.eval()
     return model
@@ -49,15 +49,12 @@ def predict(model, image_tensor):
     probabilities = torch.sigmoid(output)
     return probabilities.squeeze().cpu().numpy()
 
-def main(args):
-    # Ensure that the number of attributes matches the number of classes
-    assert len(ATTRIBUTES) == args.num_classes, "Number of attributes doesn't match num_classes"
-
+def main(image_path, checkpoint_path):
     # Load the model
-    model = load_model(args.checkpoint_path, args.num_classes)
+    model = load_model(checkpoint_path)
 
     # Preprocess the image
-    image_tensor = preprocess_image(args.image_path)
+    image_tensor = preprocess_image(image_path)
 
     # Make prediction
     probabilities = predict(model, image_tensor)
@@ -70,8 +67,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Pedestrian Attribute Recognition')
     parser.add_argument('--image_path', type=str, required=True, help='Path to the input image')
     parser.add_argument('--checkpoint_path', type=str, required=True, help='Path to the model checkpoint')
-    parser.add_argument('--num_classes', type=int, required=True, help='Number of attribute classes')
 
     args = parser.parse_args()
 
-    main(args)
+    main(args.image_path, args.checkpoint_path)
