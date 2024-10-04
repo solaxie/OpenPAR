@@ -48,12 +48,12 @@ def predict(model, image_tensor):
     probabilities = torch.sigmoid(output)
     return probabilities.squeeze().cpu().numpy()
 
-def main(image_path, checkpoint_path):
+def main(args):
     # Load the model
-    model = load_model(checkpoint_path)
+    model = load_model(args.checkpoint_path)
 
     # Preprocess the image
-    image_tensor = preprocess_image(image_path)
+    image_tensor = preprocess_image(args.image_path)
 
     # Make prediction
     probabilities = predict(model, image_tensor)
@@ -68,5 +68,4 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint_path', type=str, required=True, help='Path to the model checkpoint')
 
     args = parser.parse_args()
-
-    main(args.image_path, args.checkpoint_path)
+    main(args)
