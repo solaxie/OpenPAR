@@ -2,7 +2,6 @@ import os
 import torch
 from torchvision import transforms
 from PIL import Image
-import argparse
 from clip import clip
 from clip.model import *
 
@@ -12,6 +11,10 @@ ATTRIBUTES = [
     "shorts", "jeans", "long pants", "skirt", "dress", 
     "running", "walking", "standing", "sitting"
 ]
+
+# Hardcoded paths
+IMAGE_PATH = "/content/drive/MyDrive/PA-100K/vlcsnap-2024-09-28-20h04m06s278.jpg"
+CHECKPOINT_PATH = "/content/drive/MyDrive/PA-100K/PA100k_Checkpoint.pth"
 
 class TransformerClassifier(nn.Module):
     def __init__(self, clip_model, num_classes):
@@ -48,12 +51,12 @@ def predict(model, image_tensor):
     probabilities = torch.sigmoid(output)
     return probabilities.squeeze().cpu().numpy()
 
-def main(args):
+def main():
     # Load the model
-    model = load_model(args.checkpoint_path)
+    model = load_model(CHECKPOINT_PATH)
 
     # Preprocess the image
-    image_tensor = preprocess_image(args.image_path)
+    image_tensor = preprocess_image(IMAGE_PATH)
 
     # Make prediction
     probabilities = predict(model, image_tensor)
@@ -63,9 +66,4 @@ def main(args):
         print(f"{attr}: {prob:.4f}")
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Pedestrian Attribute Recognition')
-    parser.add_argument('--image_path', type=str, required=True, help='Path to the input image')
-    parser.add_argument('--checkpoint_path', type=str, required=True, help='Path to the model checkpoint')
-
-    args = parser.parse_args()
-    main(args)
+    main()
