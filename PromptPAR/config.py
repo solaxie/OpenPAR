@@ -45,4 +45,7 @@ def argument_parser():
 
     parser.add_argument("--checkpoint", action='store_true')
     parser.add_argument("--dir", type=str, default=None)
+    
+    parser.add_argument("--external_image", type=str, help="Path to external image for inference")
+    
     return parser
