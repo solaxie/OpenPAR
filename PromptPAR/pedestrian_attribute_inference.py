@@ -2,16 +2,15 @@ import os
 import torch
 from torchvision import transforms
 from PIL import Image
+import argparse
 from clip import clip
 from clip.model import *
-import argparse
 
-# Define ATTRIBUTES directly in the code
+# Define ATTRIBUTES
 ATTRIBUTES = [
     "male", "hat", "glasses", "shirt", "long hair", 
     "shorts", "jeans", "long pants", "skirt", "dress", 
-    "running", "walking", "standing", "sitting",
-    # Add all your attributes here
+    "running", "walking", "standing", "sitting"
 ]
 
 class TransformerClassifier(nn.Module):
