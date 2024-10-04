@@ -52,7 +52,7 @@ def predict(model, image_tensor):
     probabilities = torch.sigmoid(output)
     return probabilities.squeeze().cpu().numpy()
 
-def main():
+def run_inference():
     # Load the model
     model = load_model(CHECKPOINT_PATH)
 
@@ -67,6 +67,4 @@ def main():
         print(f"{attr}: {prob:.4f}")
 
 if __name__ == '__main__':
-    # Remove all command line arguments
-    sys.argv = [sys.argv[0]]
-    main()
+    run_inference()
