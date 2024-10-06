@@ -6,10 +6,16 @@ from models.base_block import TransformerClassifier
 from clip import clip
 from clip.model import build_model
 
+class DummyArgs:
+    def __init__(self, dataset):
+        self.dataset = dataset
+
 def load_model(checkpoint_path):
     try:
         checkpoint = torch.load(checkpoint_path, map_location='cpu')
-        clip_model = build_model(checkpoint['ViT_model'])
+        # Assume the dataset is PA100k, but you may need to adjust this
+        dummy_args = DummyArgs('PA100k')
+        clip_model = build_model(checkpoint['ViT_model'], dummy_args)
         attributes = checkpoint.get('attributes', [])
         attr_num = len(attributes)
         model = TransformerClassifier(clip_model, attr_num, attributes)
