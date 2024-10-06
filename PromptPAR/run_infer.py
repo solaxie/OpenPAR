@@ -1,11 +1,10 @@
-import argparse
+import sys
 import torch
 from PIL import Image
 from torchvision import transforms
 from models.base_block import TransformerClassifier
 from clip import clip
 from clip.model import build_model
-import sys
 
 def load_model(checkpoint_path):
     try:
@@ -42,21 +41,21 @@ def run_inference(model, clip_model, image_tensor):
     except Exception as e:
         raise RuntimeError(f"Error during inference: {str(e)}")
 
-def main(args):
-    print(f"Running inference with checkpoint: {args.checkpoint}")
-    print(f"Image path: {args.image_path}")
+def main(checkpoint_path, image_path):
+    print(f"Running inference with checkpoint: {checkpoint_path}")
+    print(f"Image path: {image_path}")
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
     try:
         # Load model and attributes
-        model, clip_model, attributes = load_model(args.checkpoint)
+        model, clip_model, attributes = load_model(checkpoint_path)
         model.to(device)
         clip_model.to(device)
 
         # Preprocess image
-        image_tensor = preprocess_image(args.image_path).to(device)
+        image_tensor = preprocess_image(image_path).to(device)
 
         # Run inference
         probabilities = run_inference(model, clip_model, image_tensor)
@@ -70,8 +69,10 @@ def main(args):
 
 if __name__ == "__main__":
     print("Argument list:", sys.argv)
-    parser = argparse.ArgumentParser(description="Run inference on a single image using PromptPAR")
-    parser.add_argument("--checkpoint", type=str, required=True, help="Path to the model checkpoint")
-    parser.add_argument("--image_path", type=str, required=True, help="Path to the input image")
-    args = parser.parse_args()
-    main(args)
+    if len(sys.argv) != 3:
+        print("Usage: python run_infer.py <checkpoint_path> <image_path>")
+        sys.exit(1)
+    
+    checkpoint_path = sys.argv[1]
+    image_path = sys.argv[2]
+    main(checkpoint_path, image_path)
