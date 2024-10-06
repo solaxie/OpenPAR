@@ -5,6 +5,7 @@ from torchvision import transforms
 from models.base_block import TransformerClassifier
 from clip import clip
 from clip.model import build_model
+import sys
 
 def load_model(checkpoint_path):
     try:
@@ -42,7 +43,11 @@ def run_inference(model, clip_model, image_tensor):
         raise RuntimeError(f"Error during inference: {str(e)}")
 
 def main(args):
+    print(f"Running inference with checkpoint: {args.checkpoint}")
+    print(f"Image path: {args.image_path}")
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
     
     try:
         # Load model and attributes
@@ -64,6 +69,7 @@ def main(args):
         print(f"An error occurred: {str(e)}")
 
 if __name__ == "__main__":
+    print("Argument list:", sys.argv)
     parser = argparse.ArgumentParser(description="Run inference on a single image using PromptPAR")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to the model checkpoint")
     parser.add_argument("--image_path", type=str, required=True, help="Path to the input image")
