@@ -5,6 +5,7 @@ import math
 from functools import reduce
 from operator import mul
 from config import argument_parser
+import config
 import numpy as np
 import torch
 import torch.nn.functional as F
