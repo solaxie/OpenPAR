@@ -12,8 +12,9 @@ from torch import nn
 from torch.nn import Conv2d, Dropout
 parser = argument_parser()
 args = parser.parse_args()
-assert args.dataset in ['PA100k', 'RAPV1','RAPV2','PETA','WIDER','PETAzs','RAPzs','UPAR','YCJC',"RAPV1Expand"], \
-    f'dataset name {args.dataset} is not exist,The legal name is PA100k,RAPV1,RAPV2,PETA,WIDER,PETAzs,RAPzs,RAPV1Expand'
+if not getattr(config, 'inference_mode', False):
+    assert args.dataset in ['PA100k', 'RAPV1','RAPV2','PETA','WIDER','PETAzs','RAPzs','UPAR','YCJC',"RAPV1Expand"], \
+        f'dataset name {args.dataset} is not exist,The legal name is PA100k,RAPV1,RAPV2,PETA,WIDER,PETAzs,RAPzs,RAPV1Expand'
 datasets_attrnum={'PA100k':26,'RAPV1':51,'PETA':35,'PETAzs':35,'UPAR':40,'RAPzs':53,'RAPV2':54,'WIDER':14,"RAPV1Expand":51}
 attr_num=datasets_attrnum[args.dataset]
 class Bottleneck(nn.Module):

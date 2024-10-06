@@ -14,17 +14,17 @@ ATTRIBUTES = [
 ]
 
 def load_model(checkpoint_path):
-    # 加载CLIP模型
-    clip_model, _ = clip.load("ViT-L/14", device="cuda" if torch.cuda.is_available() else "cpu")
+    checkpoint = torch.load(checkpoint_path, map_location=device)
     
-    # 创建TransformerClassifier模型
-    model = TransformerClassifier(clip_model, len(ATTRIBUTES), ATTRIBUTES)
+    # 假设 checkpoint 中包含了属性数量和列表
+    attr_num = checkpoint.get('attr_num', 26)  # 默认值为 PA100k 的属性数量
+    attributes = checkpoint.get('attributes', [...])  # 默认属性列表
     
-    # 加载checkpoint
-    checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
+    clip_model, _ = clip.load("ViT-L/14", device=device)
+    model = TransformerClassifier(clip_model, attr_num, attributes)
     model.load_state_dict(checkpoint['model_state_dict'])
     
-    return model, clip_model
+    return model, clip_model, attributes
 
 def preprocess_image(image_path):
     # 图像预处理
@@ -43,11 +43,16 @@ def infer(model, clip_model, image):
         predictions = torch.sigmoid(logits) > 0.5
     return predictions
 
-def main(args):
+def main():
+    args = parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
+    # 设置推理模式标志
+    import config
+    config.inference_mode = True
+    
     # 加载模型
-    model, clip_model = load_model(args.checkpoint)
+    model, clip_model, attributes = load_model(args.checkpoint)
     model.to(device)
     clip_model.to(device)
 
