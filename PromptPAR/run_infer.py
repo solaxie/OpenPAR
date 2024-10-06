@@ -1,60 +1,71 @@
 import argparse
 import torch
 from PIL import Image
+from torchvision import transforms
 from models.base_block import TransformerClassifier
-from dataset.AttrDataset import get_transform
+from clip import clip
 from clip.model import build_model
 
-def load_external_image(image_path, transform):
-    image = Image.open(image_path).convert('RGB')
-    return transform(image).unsqueeze(0)  # Add batch dimension
+def load_model(checkpoint_path):
+    try:
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        clip_model = build_model(checkpoint['ViT_model'])
+        attributes = checkpoint.get('attributes', [])
+        attr_num = len(attributes)
+        model = TransformerClassifier(clip_model, attr_num, attributes)
+        model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+        return model, clip_model, attributes
+    except Exception as e:
+        raise RuntimeError(f"Error loading model: {str(e)}")
 
-def main(args):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+def preprocess_image(image_path):
+    try:
+        transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+        with Image.open(image_path) as img:
+            img = img.convert('RGB')
+            return transform(img).unsqueeze(0)
+    except Exception as e:
+        raise RuntimeError(f"Error preprocessing image: {str(e)}")
 
-    # Load the model
-    checkpoint = torch.load(args.checkpoint, map_location=device)
-    clip_model = build_model(checkpoint['ViT_model'])
-    model = TransformerClassifier(clip_model, checkpoint['attr_num'], checkpoint['attributes'])
-    model.load_state_dict(checkpoint['model_state_dict'], strict=False)
-    model = model.to(device)
-    clip_model = clip_model.to(device)
-
-    # Set models to evaluation mode
+@torch.no_grad()
+def run_inference(model, clip_model, image_tensor):
     model.eval()
     clip_model.eval()
+    try:
+        logits, _ = model(image_tensor, clip_model=clip_model)
+        return torch.sigmoid(logits).squeeze().cpu().numpy()
+    except Exception as e:
+        raise RuntimeError(f"Error during inference: {str(e)}")
 
-    # Get the transform
-    _, valid_tsfm = get_transform(args)
+def main(args):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    try:
+        # Load model and attributes
+        model, clip_model, attributes = load_model(args.checkpoint)
+        model.to(device)
+        clip_model.to(device)
 
-    # Load and transform the external image
-    img = load_external_image(args.image_path, valid_tsfm)
-    img = img.to(device)
+        # Preprocess image
+        image_tensor = preprocess_image(args.image_path).to(device)
 
-    # Perform inference
-    with torch.no_grad():
-        logits, _ = model(img, clip_model=clip_model)
-        probs = torch.sigmoid(logits)
+        # Run inference
+        probabilities = run_inference(model, clip_model, image_tensor)
 
-    # Process and print results
-    attributes = checkpoint['attributes']
-    for attr, prob in zip(attributes, probs[0]):
-        print(f"{attr}: {prob.item():.4f}")
+        # Print results
+        for attr, prob in zip(attributes, probabilities):
+            print(f"{attr}: {prob:.4f}")
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Inference for external image")
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run inference on a single image using PromptPAR")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to the model checkpoint")
     parser.add_argument("--image_path", type=str, required=True, help="Path to the input image")
-    
-    # Add any other necessary arguments that affect the model or transform
-    parser.add_argument("--height", type=int, default=224)
-    parser.add_argument("--width", type=int, default=224)
-    parser.add_argument("--use_div", action='store_true')
-    parser.add_argument("--use_vismask", action='store_true')
-    parser.add_argument("--use_GL", action='store_true')
-    parser.add_argument("--use_textprompt", action='store_true')
-    parser.add_argument("--use_mm_former", action='store_true')
-    parser.add_argument("--vis_prompt", type=int, default=50)
-    
     args = parser.parse_args()
     main(args)
