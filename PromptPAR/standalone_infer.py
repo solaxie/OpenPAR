@@ -111,35 +111,29 @@ def load_image(image_path):
 def load_model(checkpoint_path):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    try:
-        checkpoint = torch.load(checkpoint_path, map_location=device)
-        
-        # 提取必要信息
-        model_state_dict = checkpoint['model_state_dict']
-        attr_num = checkpoint.get('attr_num', 26)  # 默认值
-        attributes = checkpoint.get('attributes', [f"Attribute_{i}" for i in range(attr_num)])  # 默认属性列表
-        
-        # 初始化CLIP模型
-        clip_model = CLIP(
-            embed_dim=512,
-            image_resolution=224,
-            vision_layers=24,
-            vision_width=1024,
-            vision_patch_size=14
-        )
-        
-        print(f"CLIP model structure: {clip_model}")  # 调试输出
-        
-        # 初始化并加载模型
-        model = TransformerClassifier(clip_model, attr_num)
-        model.load_state_dict(model_state_dict)
-        model.to(device)
-        model.eval()
-        
-        return model, clip_model, attributes
-    except Exception as e:
-        print(f"Error loading model: {e}")
-        raise
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    
+    # 提取必要信息
+    model_state_dict = checkpoint['model_state_dict']
+    attr_num = checkpoint['attr_num']
+    attributes = checkpoint['attributes']
+    
+    # 初始化CLIP模型
+    clip_model = CLIP(
+        embed_dim=512,
+        image_resolution=224,
+        vision_layers=24,
+        vision_width=1024,
+        vision_patch_size=14
+    )
+    
+    # 初始化并加载模型
+    model = TransformerClassifier(clip_model, attr_num)
+    model.load_state_dict(model_state_dict)
+    model.to(device)
+    model.eval()
+    
+    return model, clip_model, attributes
 
 def main():
     parser = argparse.ArgumentParser(description="Run inference on a single image")
