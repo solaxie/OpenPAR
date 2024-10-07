@@ -103,15 +103,23 @@ def main():
 
     image = load_image(args.image_path).to(device)
 
+    # 使用 pa100k.py 中的属性列表
+    attributes = [
+        'female',
+        'age over 60', 'age 18 to 60', 'age less 18',
+        'front', 'side', 'back',
+        'hat', 'glasses', 
+        'hand bag', 'shoulder bag', 'backpack', 'hold objects in front', 
+        'short sleeve', 'long sleeve', 'upper stride', 'upper logo', 'upper plaid', 'upper splice',
+        'lower stripe', 'lower pattern', 'long coat', 'trousers', 'shorts', 'skirt and dress', 'boots'
+    ]
+
     with torch.no_grad():
         features = vit(image)
         outputs = classifier(features[:, :768])  # 只使用前768维特征
     
     predictions = torch.sigmoid(outputs) > 0.5
 
-    # Assuming you have a list of attribute names
-    attributes = [f"Attribute_{i}" for i in range(26)]  # Replace with actual attribute names
-    
     print("Detected attributes:")
     for attr, pred in zip(attributes, predictions[0]):
         if pred:
