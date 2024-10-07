@@ -4,50 +4,22 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
 from PIL import Image
-import math
-from collections import OrderedDict
-from clip import clip
 
-# CLIP模型相关类和函数
-class QuickGELU(nn.Module):
-    def forward(self, x: torch.Tensor):
-        return x * torch.sigmoid(1.702 * x)
-
-class ResidualAttentionBlock(nn.Module):
-    def __init__(self, d_model: int, n_head: int):
-        super().__init__()
-        self.attn = nn.MultiheadAttention(d_model, n_head)
-        self.ln_1 = nn.LayerNorm(d_model)
-        self.mlp = nn.Sequential(OrderedDict([
-            ("c_fc", nn.Linear(d_model, d_model * 4)),
-            ("gelu", QuickGELU()),
-            ("c_proj", nn.Linear(d_model * 4, d_model))
-        ]))
-        self.ln_2 = nn.LayerNorm(d_model)
-
-    def forward(self, x: torch.Tensor):
-        x = x + self.attn(self.ln_1(x), self.ln_1(x), self.ln_1(x))[0]
-        x = x + self.mlp(self.ln_2(x))
-        return x
-
-class Transformer(nn.Module):
-    def __init__(self, width: int, layers: int, heads: int):
-        super().__init__()
-        self.resblocks = nn.Sequential(*[ResidualAttentionBlock(width, heads) for _ in range(layers)])
-
-    def forward(self, x: torch.Tensor):
-        return self.resblocks(x)
-
+# CLIP ViT-L/14 模型的简化版本
 class VisionTransformer(nn.Module):
-    def __init__(self, input_resolution: int, patch_size: int, width: int, layers: int, heads: int, output_dim: int):
+    def __init__(self, input_resolution=224, patch_size=14, width=1024, layers=24, heads=16, output_dim=768):
         super().__init__()
+        self.input_resolution = input_resolution
         self.output_dim = output_dim
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=width, kernel_size=patch_size, stride=patch_size, bias=False)
         scale = width ** -0.5
         self.class_embedding = nn.Parameter(scale * torch.randn(width))
         self.positional_embedding = nn.Parameter(scale * torch.randn((input_resolution // patch_size) ** 2 + 1, width))
         self.ln_pre = nn.LayerNorm(width)
-        self.transformer = Transformer(width, layers, heads)
+        self.transformer = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model=width, nhead=heads, dim_feedforward=width * 4),
+            num_layers=layers
+        )
         self.ln_post = nn.LayerNorm(width)
         self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
 
@@ -66,44 +38,24 @@ class VisionTransformer(nn.Module):
             x = x @ self.proj
         return x
 
-class CLIP(nn.Module):
-    def __init__(self, embed_dim: int, image_resolution: int, vision_layers: int, vision_width: int, vision_patch_size: int):
-        super().__init__()
-        self.output_dim = embed_dim
-        self.visual = VisionTransformer(
-            input_resolution=image_resolution,
-            patch_size=vision_patch_size,
-            width=vision_width,
-            layers=vision_layers,
-            heads=vision_width // 64,
-            output_dim=embed_dim
-        )
-
-    def encode_image(self, image):
-        return self.visual(image.type(self.visual.conv1.weight.dtype))
-
-# TransformerClassifier 类
 class TransformerClassifier(nn.Module):
-    def __init__(self, clip_model, attr_num, attributes, dim=768):
+    def __init__(self, attr_num, dim=768):
         super().__init__()
         self.attr_num = attr_num
-        self.word_embed = nn.Linear(clip_model.visual.output_dim, dim)
+        self.vit = VisionTransformer()
+        self.word_embed = nn.Linear(self.vit.output_dim, dim)
         self.weight_layer = nn.ModuleList([nn.Linear(dim, 1) for _ in range(self.attr_num)])
         self.dim = dim
         self.bn = nn.BatchNorm1d(self.attr_num)
 
-    def forward(self, imgs, clip_model):
-        clip_image_features = clip_model.encode_image(imgs)
+    def forward(self, imgs):
+        clip_image_features = self.vit(imgs)
         x = self.word_embed(clip_image_features).unsqueeze(1).repeat(1, self.attr_num, 1)
         logits = torch.cat([self.weight_layer[i](x[:, i, :]) for i in range(self.attr_num)], dim=1)
         bn_logits = self.bn(logits)
-        return bn_logits, None
+        return bn_logits
 
-# 辅助函数
 def load_image(image_path):
-    from torchvision import transforms
-    from PIL import Image
-
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
@@ -117,22 +69,20 @@ def load_model(checkpoint_path):
     
     checkpoint = torch.load(checkpoint_path, map_location=device)
     
-    # 提取必要信息
     model_state_dict = checkpoint['model_state_dict']
-    attr_num = checkpoint.get('attr_num', 26)  # 默认值，根据实际情况调整
+    attr_num = checkpoint.get('attr_num', 26)  # 默认值
     attributes = checkpoint.get('attributes', [f"Attribute_{i}" for i in range(attr_num)])
     
-    # 初始化CLIP模型
-    clip_model, _ = clip.load("ViT-L/14", device=device)
+    model = TransformerClassifier(attr_num)
     
-    # 初始化TransformerClassifier
-    model = TransformerClassifier(clip_model, attr_num, attributes)
+    # 只加载匹配的参数
+    model_dict = model.state_dict()
+    pretrained_dict = {k: v for k, v in model_state_dict.items() if k in model_dict and v.shape == model_dict[k].shape}
+    model_dict.update(pretrained_dict)
+    model.load_state_dict(model_dict)
     
-    # 加载模型权重
-    model.load_state_dict(model_state_dict)
     model.eval()
-    
-    return model, clip_model, attributes
+    return model, attributes
 
 def main():
     parser = argparse.ArgumentParser(description="Run inference on a single image")
@@ -142,22 +92,16 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    # 加载模型
-    model, clip_model, attributes = load_model(args.checkpoint)
+    model, attributes = load_model(args.checkpoint)
     model.to(device)
-    clip_model.to(device)
 
-    # 加载并预处理图像
     image = load_image(args.image_path).to(device)
 
-    # 推理
     with torch.no_grad():
-        outputs, _ = model(image, clip_model)
+        outputs = model(image)
     
-    # 处理输出
     predictions = torch.sigmoid(outputs) > 0.5
 
-    # 打印结果
     print("Detected attributes:")
     for attr, pred in zip(attributes, predictions[0]):
         if pred:
