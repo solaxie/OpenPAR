@@ -40,6 +40,7 @@ class Transformer(nn.Module):
 class VisionTransformer(nn.Module):
     def __init__(self, input_resolution: int, patch_size: int, width: int, layers: int, heads: int, output_dim: int):
         super().__init__()
+        self.output_dim = output_dim
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=width, kernel_size=patch_size, stride=patch_size, bias=False)
         scale = width ** -0.5
         self.class_embedding = nn.Parameter(scale * torch.randn(width))
@@ -67,6 +68,7 @@ class VisionTransformer(nn.Module):
 class CLIP(nn.Module):
     def __init__(self, embed_dim: int, image_resolution: int, vision_layers: int, vision_width: int, vision_patch_size: int):
         super().__init__()
+        self.output_dim = embed_dim
         self.visual = VisionTransformer(
             input_resolution=image_resolution,
             patch_size=vision_patch_size,
@@ -84,7 +86,7 @@ class TransformerClassifier(nn.Module):
     def __init__(self, clip_model, attr_num, dim=768):
         super().__init__()
         self.attr_num = attr_num
-        self.word_embed = nn.Linear(clip_model.visual.output_dim, dim)
+        self.word_embed = nn.Linear(clip_model.output_dim, dim)
         self.weight_layer = nn.ModuleList([nn.Linear(dim, 1) for _ in range(self.attr_num)])
         self.dim = dim
         self.bn = nn.BatchNorm1d(self.attr_num)
@@ -109,29 +111,35 @@ def load_image(image_path):
 def load_model(checkpoint_path):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    checkpoint = torch.load(checkpoint_path, map_location=device)
-    
-    # 提取必要信息
-    model_state_dict = checkpoint['model_state_dict']
-    attr_num = checkpoint.get('attr_num', 26)  # 默认值
-    attributes = checkpoint.get('attributes', [f"Attribute_{i}" for i in range(attr_num)])  # 默认属性列表
-    
-    # 初始化CLIP模型
-    clip_model = CLIP(
-        embed_dim=512,
-        image_resolution=224,
-        vision_layers=24,
-        vision_width=1024,
-        vision_patch_size=14
-    )
-    
-    # 初始化并加载模型
-    model = TransformerClassifier(clip_model, attr_num)
-    model.load_state_dict(model_state_dict)
-    model.to(device)
-    model.eval()
-    
-    return model, clip_model, attributes
+    try:
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        
+        # 提取必要信息
+        model_state_dict = checkpoint['model_state_dict']
+        attr_num = checkpoint.get('attr_num', 26)  # 默认值
+        attributes = checkpoint.get('attributes', [f"Attribute_{i}" for i in range(attr_num)])  # 默认属性列表
+        
+        # 初始化CLIP模型
+        clip_model = CLIP(
+            embed_dim=512,
+            image_resolution=224,
+            vision_layers=24,
+            vision_width=1024,
+            vision_patch_size=14
+        )
+        
+        print(f"CLIP model structure: {clip_model}")  # 调试输出
+        
+        # 初始化并加载模型
+        model = TransformerClassifier(clip_model, attr_num)
+        model.load_state_dict(model_state_dict)
+        model.to(device)
+        model.eval()
+        
+        return model, clip_model, attributes
+    except Exception as e:
+        print(f"Error loading model: {e}")
+        raise
 
 def main():
     parser = argparse.ArgumentParser(description="Run inference on a single image")
