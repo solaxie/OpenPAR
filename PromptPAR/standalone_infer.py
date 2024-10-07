@@ -54,8 +54,10 @@ class TransformerClassifier(nn.Module):
         self.word_embed = nn.Linear(dim, dim)
         self.weight_layer = nn.ModuleList([nn.Linear(dim, 1) for _ in range(attr_num)])
         self.bn = nn.BatchNorm1d(attr_num)
+        self.vis_embed = nn.Linear(dim, dim)
 
     def forward(self, x):
+        x = self.vis_embed(x)
         x = self.word_embed(x)
         logits = torch.cat([layer(x) for layer in self.weight_layer], dim=1)
         return self.bn(logits)
@@ -73,10 +75,15 @@ def load_model(checkpoint_path):
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
     
     vit = VisionTransformer()
-    vit.load_state_dict(checkpoint['ViT_model'], strict=False)
-    
     classifier = TransformerClassifier(attr_num=26)  # PA100k has 26 attributes
-    classifier.load_state_dict(checkpoint['model_state_dict'])
+    
+    # 加载 ViT 模型
+    vit_state_dict = {k.replace('vit.', ''): v for k, v in checkpoint['model_state_dict'].items() if k.startswith('vit.')}
+    vit.load_state_dict(vit_state_dict, strict=False)
+    
+    # 加载分类器模型
+    classifier_state_dict = {k: v for k, v in checkpoint['model_state_dict'].items() if not k.startswith('vit.')}
+    classifier.load_state_dict(classifier_state_dict, strict=False)
     
     return vit, classifier
 
