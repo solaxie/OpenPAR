@@ -6,7 +6,7 @@ from torchvision import transforms
 from PIL import Image
 
 class VisionTransformer(nn.Module):
-    def __init__(self, input_resolution=224, patch_size=16, width=768, layers=12, heads=12, output_dim=768):
+    def __init__(self, input_resolution=224, patch_size=16, width=768, layers=12, heads=12, output_dim=1000):
         super().__init__()
         self.input_resolution = input_resolution
         self.output_dim = output_dim
@@ -74,7 +74,7 @@ def load_image(image_path):
 def load_model(checkpoint_path):
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
     
-    vit = VisionTransformer()
+    vit = VisionTransformer(output_dim=1000)  # 设置输出维度为1000
     classifier = TransformerClassifier(attr_num=26)  # PA100k has 26 attributes
     
     # 加载 ViT 模型
@@ -105,7 +105,7 @@ def main():
 
     with torch.no_grad():
         features = vit(image)
-        outputs = classifier(features)
+        outputs = classifier(features[:, :768])  # 只使用前768维特征
     
     predictions = torch.sigmoid(outputs) > 0.5
 
