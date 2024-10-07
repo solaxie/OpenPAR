@@ -69,20 +69,27 @@ def load_image(image_path):
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
     image = Image.open(image_path).convert('RGB')
-    return transform(image).unsqueeze(0)
+    tensor = transform(image).unsqueeze(0)
+    
+    # 保存处理后的图像以进行检查
+    processed_image = tensor.squeeze().permute(1, 2, 0).cpu().numpy()
+    plt.imsave('processed_image.png', processed_image)
+    
+    return tensor
 
 def load_model(checkpoint_path):
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
     
-    vit = VisionTransformer(output_dim=1000)  # 设置输出维度为1000
-    classifier = TransformerClassifier(attr_num=26)  # PA100k has 26 attributes
+    vit = VisionTransformer(output_dim=1000)
+    classifier = TransformerClassifier(attr_num=26)
     
-    # 加载 ViT 模型
     vit_state_dict = {k.replace('vit.', ''): v for k, v in checkpoint['model_state_dict'].items() if k.startswith('vit.')}
-    vit.load_state_dict(vit_state_dict, strict=False)
-    
-    # 加载分类器模型
     classifier_state_dict = {k: v for k, v in checkpoint['model_state_dict'].items() if not k.startswith('vit.')}
+    
+    print("VIT state dict keys:", vit_state_dict.keys())
+    print("Classifier state dict keys:", classifier_state_dict.keys())
+    
+    vit.load_state_dict(vit_state_dict, strict=False)
     classifier.load_state_dict(classifier_state_dict, strict=False)
     
     return vit, classifier
@@ -117,7 +124,9 @@ def main():
     with torch.no_grad():
         features = vit(image)
         outputs = classifier(features[:, :768])  # 只使用前768维特征
-    
+        print("Raw outputs:", outputs)
+        print("Sigmoid outputs:", torch.sigmoid(outputs))
+        
     predictions = torch.sigmoid(outputs) > 0.5
 
     print("Detected attributes:")
