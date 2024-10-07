@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
 from PIL import Image
+import matplotlib.pyplot as plt
 
 class VisionTransformer(nn.Module):
     def __init__(self, input_resolution=224, patch_size=16, width=768, layers=12, heads=12, output_dim=1000):
