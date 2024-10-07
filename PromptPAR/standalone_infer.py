@@ -85,6 +85,8 @@ class CLIP(nn.Module):
 class TransformerClassifier(nn.Module):
     def __init__(self, clip_model, attr_num, dim=768):
         super().__init__()
+        if not isinstance(attr_num, int) or attr_num <= 0:
+            raise ValueError(f"Invalid attr_num: {attr_num}. Must be a positive integer.")
         self.attr_num = attr_num
         self.word_embed = nn.Linear(clip_model.output_dim, dim)
         self.weight_layer = nn.ModuleList([nn.Linear(dim, 1) for _ in range(self.attr_num)])
@@ -113,11 +115,22 @@ def load_model(checkpoint_path):
     
     checkpoint = torch.load(checkpoint_path, map_location=device)
     
-    # 提取必要信息
-    model_state_dict = checkpoint['model_state_dict']
-    attr_num = checkpoint['attr_num']
-    attributes = checkpoint['attributes']
-    
+    # 提取必要信息，添加错误检查和默认值
+    model_state_dict = checkpoint.get('model_state_dict')
+    if model_state_dict is None:
+        raise ValueError("model_state_dict not found in checkpoint")
+
+    attr_num = checkpoint.get('attr_num')
+    if attr_num is None:
+        print("Warning: attr_num not found in checkpoint. Using default value.")
+        attr_num = 26  # 使用默认值，可以根据实际情况调整
+
+    attributes = checkpoint.get('attributes', [f"Attribute_{i}" for i in range(attr_num)])
+
+    # 打印调试信息
+    print(f"Loaded attr_num: {attr_num}")
+    print(f"Loaded attributes: {attributes}")
+
     # 初始化CLIP模型
     clip_model = CLIP(
         embed_dim=512,
@@ -129,7 +142,18 @@ def load_model(checkpoint_path):
     
     # 初始化并加载模型
     model = TransformerClassifier(clip_model, attr_num)
-    model.load_state_dict(model_state_dict)
+    
+    # 检查模型结构是否与state_dict匹配
+    try:
+        model.load_state_dict(model_state_dict)
+    except RuntimeError as e:
+        print(f"Error loading state dict: {e}")
+        print("Model structure:")
+        print(model)
+        print("\nState dict keys:")
+        print(model_state_dict.keys())
+        raise
+
     model.to(device)
     model.eval()
     
@@ -143,26 +167,31 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    # 加载模型
-    model, clip_model, attributes = load_model(args.checkpoint)
-    model.to(device)
-    clip_model.to(device)
+    try:
+        # 加载模型
+        model, clip_model, attributes = load_model(args.checkpoint)
+        model.to(device)
+        clip_model.to(device)
 
-    # 加载并预处理图像
-    image = load_image(args.image_path).to(device)
+        # 加载并预处理图像
+        image = load_image(args.image_path).to(device)
 
-    # 推理
-    with torch.no_grad():
-        outputs, _ = model(image, clip_model)
-    
-    # 处理输出
-    predictions = torch.sigmoid(outputs) > 0.5
+        # 推理
+        with torch.no_grad():
+            outputs, _ = model(image, clip_model)
+        
+        # 处理输出
+        predictions = torch.sigmoid(outputs) > 0.5
 
-    # 打印结果
-    print("Detected attributes:")
-    for attr, pred in zip(attributes, predictions[0]):
-        if pred:
-            print(f"- {attr}")
+        # 打印结果
+        print("Detected attributes:")
+        for attr, pred in zip(attributes, predictions[0]):
+            if pred:
+                print(f"- {attr}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()
