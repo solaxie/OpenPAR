@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
 from PIL import Image
-from matplotlib import pyplot as plt
+from torchvision import utils as vutils
 
 class VisionTransformer(nn.Module):
     def __init__(self, input_resolution=224, patch_size=16, width=768, layers=12, heads=12, output_dim=1000):
@@ -73,6 +73,7 @@ class TransformerClassifier(nn.Module):
     tensor = transform(image).unsqueeze(0)
     
     return tensor """
+
 def load_image(image_path):
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
@@ -82,11 +83,11 @@ def load_image(image_path):
     image = Image.open(image_path).convert('RGB')
     tensor = transform(image).unsqueeze(0)
     
-    # 保存处理后的图像以进行检查
-    processed_image = tensor.squeeze().permute(1, 2, 0).cpu().numpy()
-    plt.imsave('processed_image.png', processed_image)
-    
+    # 直接使用 torchvision.utils.save_image 保存圖像
+    vutils.save_image(tensor, 'processed_image.png')
+
     return tensor
+
 
 def load_model(checkpoint_path):
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
