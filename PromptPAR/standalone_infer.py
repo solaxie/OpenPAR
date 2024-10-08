@@ -163,6 +163,15 @@ def main():
     for attr, pred in zip(attributes, predictions[0]):
         if pred:
             print(f"- {attr}")
+    
+    thresholds = [0.3, 0.5, 0.7]
+    for threshold in thresholds:
+        predictions = torch.sigmoid(outputs) > threshold
+    print(f"Predictions with threshold {threshold}:")
+    for attr, pred in zip(attributes, predictions[0]):
+        if pred:
+            print(f"- {attr}")
+    print()
 
 if __name__ == "__main__":
     main()
