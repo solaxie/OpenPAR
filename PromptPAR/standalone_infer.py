@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
 from PIL import Image
+from matplotlib import pyplot as plt
 
 class VisionTransformer(nn.Module):
     def __init__(self, input_resolution=224, patch_size=16, width=768, layers=12, heads=12, output_dim=1000):
@@ -62,6 +63,16 @@ class TransformerClassifier(nn.Module):
         logits = torch.cat([layer(x) for layer in self.weight_layer], dim=1)
         return self.bn(logits)
 
+""" def load_image(image_path):
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    image = Image.open(image_path).convert('RGB')
+    tensor = transform(image).unsqueeze(0)
+    
+    return tensor """
 def load_image(image_path):
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
@@ -70,6 +81,10 @@ def load_image(image_path):
     ])
     image = Image.open(image_path).convert('RGB')
     tensor = transform(image).unsqueeze(0)
+    
+    # 保存处理后的图像以进行检查
+    processed_image = tensor.squeeze().permute(1, 2, 0).cpu().numpy()
+    plt.imsave('processed_image.png', processed_image)
     
     return tensor
 
